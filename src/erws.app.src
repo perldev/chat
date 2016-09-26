@@ -1,0 +1,14 @@
+{application, erws, [  
+        {description, ""},  
+        {vsn, "1"},  
+        {registered, []},  
+        {applications, [  
+            
+            kernel,
+            stdlib,
+            crypto,
+            cowboy
+        ]},  
+        {mod, { erws_app, []}},  
+        {env, []}  
+]}.  

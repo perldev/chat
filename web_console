@@ -1,0 +1,95 @@
+#!/bin/sh
+#
+NODE=chat1
+HOST=localhost.localdomain
+HOST_TEST=localhost.localdomain
+APP=erws_app
+EBIN_DIR=ebin
+HOME_D=deps
+
+HOME_P="-pa $EBIN_DIR  $HOME_D/*/ebin  "
+#DOTTED=` | grep '\.'`
+TYPE="name"
+ 
+ERL="erl +A 4 +K true" #-config siteheart"
+
+
+start(){
+	echo "starting Erlang visor Server"
+	LC_CTYPE=en_US.UTF-8 $ERL $HOME_P -kernel error_logger false  -noinput -detached  -boot start_sasl -s $APP -$TYPE $NODE@$HOST -config sys
+}
+start_debug(){
+	echo "starting debug"
+	$ERL    $HOME_P  -s $APP  -kernel error_logger false    -boot start_sasl  -$TYPE debug_$NODE@$HOST_TEST -config sys
+
+
+}
+shell()
+{
+	$ERL \
+	-$TYPE shell$NODE@$HOST \
+	$HOME_P \
+	-boot start_sasl 
+	
+}
+ctl()
+{
+	echo "run command ussd server"
+	$ERL \
+	-$TYPE ctl_${$}_$NODE@$HOST \
+	$HOME_P \
+	-noinput -detached -hidden \
+	-boot start_sasl \
+	-s $APP_CTL -extra $NODE@$HOST $@
+}
+restart()
+{
+#       ctl stop
+        echo "Application has been stopped"
+#       sleep 2
+        pkill -TERM -f "$NODE@$HOST" && echo "Process has been terminated"
+        pkill -KILL -f "$NODE@$HOST" && echo "Process has been killed"
+        echo "starting Erlang visor Server"
+        LC_CTYPE=en_US.UTF-8\
+        $ERL \
+        $HOME_P \
+        -kernel error_logger false \
+        -noinput -detached \
+        -boot start_sasl \
+        -s $APP  \
+        -$TYPE $NODE@$HOST
+        
+}
+
+stop()
+{
+#	ctl stop
+	echo "Application has been stopped"
+#	sleep 2
+	pkill -TERM -f "$NODE@$HOST" && echo "Process has been terminated"
+	pkill -KILL -f "$NODE@$HOST" && echo "Process has been killed"
+}
+
+info()
+{
+	shell info
+}
+
+rotate()
+{
+	ctl rotate
+}
+
+reload()
+{
+	ctl reload
+}
+
+usage(){
+	echo "$0 {start|stop|reload|info|ctl|shell|rotate}"
+}
+
+[ $# -lt 1 ] && usage
+
+$@
+
