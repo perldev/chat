@@ -7,6 +7,7 @@
          get_last_count/4,
          delete_firstN_msgs/3,
          get_firstN_msgs/3,
+	 get_msg/2,
 	 raw_msg/2
          ]).
 
@@ -206,6 +207,14 @@ put_new_message(Tab, { Username, MessBin } )->
                           }),
        Ref                   
 .
+get_msg(Tab, Id)->
+    case ets:lookup(Tab , Id)  of 
+	[Msg] -> { Msg#message_record.time, Msg#message_record.username,  Msg#message_record.message};
+        [] -> undefined
+    end.
+		  
+
+
 
 raw_msg(Tab, Msg )->
        Ref = erlang:make_ref(),

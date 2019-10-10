@@ -31,7 +31,7 @@ terminate(_Req, _State) -> ok.
 % Called for every new websocket connection.
 websocket_init(State) ->
     ?CONSOLE_LOG("~nNew client ~p", [State]),
-    {ok,  State}.
+    {ok,  State#chat_state{pid=self()}}.
 
 % Called when a text message arrives.
 websocket_handle({text, Msg},  State) ->
@@ -51,9 +51,9 @@ websocket_handle(Any,  State) ->
 
 % Other messages from the system are handled here.
 % Other messages from the system are handled here.
-websocket_info({new_message, Msg}, Req, State) ->
-     ?CONSOLE_LOG("info: ~p ~n ~p~n~n", [Req, State]),
-     {reply, {text, }, State}.
+websocket_info({new_message, Msg},  State) ->
+     ?CONSOLE_LOG("info:  ~n ~p ~p ~n~n", [ State, Msg]),
+     {reply, {text, Msg }, State};
 websocket_info(_Info,  State) ->
     ?CONSOLE_LOG("info: ~p ~n ~p~n~n", [State]),
     {ok,  State}.
@@ -70,13 +70,18 @@ websocket_terminate(Reason, State) ->
 % <<"[{\"bing\":1,\"test\":2},2.3,true]">>
 % 
 
-send_them_all(State, Message)
-        ets:foldl(fun(Elem, Acc) ->  Elem#chat_state.pid ! {new_message, Message } end, [], ?SESSIONS).
+send_them_all(Id)->
+       case chat_api:get_msg(?MESSAGES, Id) of
+	       {Time, Username, Msg} ->  ets:foldl(fun(Elem, Acc) ->  Elem#chat_state.pid ! {new_message,  json_encode([{<<"status">>, true}, {<<"new_messages">>, [ process_chat_msg(Id, Time, Username, Msg) ] }]) } end, [], ?SESSIONS);
+
+	         _ ->
+                     ?CONSOLE_LOG("no message with this id: ~p ~n~n", [Id])
+	end.
 
 process_req(State  = #chat_state{ index = 0},
                 [ {<<"ping">>, _}] )->
             From  = chat_api:last(?MESSAGES),
-            List = chat_api:get_last_count(?MESSAGES, From, 100, fun process_chat_msg/4),    
+            List = chat_api:get_from_reverse(?MESSAGES, From, 0, fun process_chat_msg/4),    
             ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
             Json = json_encode([{<<"status">>,true},
                                 {<<"new_messages">>, List } ]  ),
@@ -89,7 +94,7 @@ process_req(State  = #chat_state{ index = Index},
                  [From, Index]),
             List = chat_api:get_from_reverse(?MESSAGES, From, Index, fun process_chat_msg/4),    
             Json = json_encode([{<<"status">>,true},
-                                {<<"new_messages">>, List } ]  ),
+                                {<<"new_messages">>, [] } ]  ),
             { Json, State#chat_state{ index = From } }
 ;         
 process_req(State  = #chat_state{username = "", index = Index },
@@ -125,11 +130,8 @@ process_req(State  = #chat_state{username = "", index = Index },
                                                                       username = RealUserName }) of
                                              true ->
                                                 From  = chat_api:put_new_message(?MESSAGES, {RealUserName, Msg}),
-                                                List  =  chat_api:get_from_reverse(?MESSAGES, From, Index,
-                                                                                   fun process_chat_msg/4),
-
-                                                Json  = json_encode([{<<"status">>,true},
-                                                                     {<<"new_messages">>, List } ]  ),
+                                                send_them_all(From),
+                                                Json  = json_encode([{<<"status">>,true}]),
                                                 { Json,  NewState#chat_state{index = From} };
                                              false->
                                                 { <<"{status:false}">>,  NewState }
@@ -146,9 +148,8 @@ process_req(State  = #chat_state{last_post = Time, index = Index,
            true ->
 
                 From  = chat_api:put_new_message(?MESSAGES, {Username, Msg}),
-                List = chat_api:get_from_reverse(?MESSAGES, From, Index, fun process_chat_msg/4),
-                Json = json_encode([{<<"status">>,true},
-                                    {<<"new_messages">>, List } ] ),                     
+                send_them_all(From),
+                Json = json_encode([{<<"status">>,true}]),                     
                 { Json, 
                                          State#chat_state{
                                                           index = From,
