@@ -81,7 +81,8 @@ send_them_all(Id)->
 process_req(State  = #chat_state{ index = 0},
                 [ {<<"ping">>, _}] )->
             From  = chat_api:last(?MESSAGES),
-            List = chat_api:get_from_reverse(?MESSAGES, From, 0, fun process_chat_msg/4),    
+	    
+            List = chat_api:get_from_reverse(?MESSAGES, From, 100, fun process_chat_msg/4),    
             ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
             Json = json_encode([{<<"status">>,true},
                                 {<<"new_messages">>, List } ]  ),
