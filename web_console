@@ -1,8 +1,9 @@
 #!/bin/sh
 #
-NODE=chat1
-HOST=localhost.localdomain
-HOST_TEST=localhost.localdomain
+NODE=chat
+HOST=prod2.localdomain
+#   localhost.localdomain
+HOST_TEST=btc-trade.app
 APP=erws_app
 EBIN_DIR=ebin
 HOME_D=deps
@@ -16,11 +17,14 @@ ERL="erl +A 4 +K true" #-config siteheart"
 
 start(){
 	echo "starting Erlang visor Server"
-	LC_CTYPE=en_US.UTF-8 $ERL $HOME_P -kernel error_logger false  -noinput -detached  -boot start_sasl -s $APP -$TYPE $NODE@$HOST -config sys
+	echo "LC_CTYPE=en_US.UTF-8  $ERL $HOME_P -kernel error_logger false     -noinput -detached -setcookie mytoken -boot start_sasl -s $APP -$TYPE $NODE -config sys"
+	LC_CTYPE=en_US.UTF-8  $ERL $HOME_P -kernel error_logger false     -noinput -detached -setcookie mytoken -boot start_sasl -s $APP -$TYPE $NODE -config sys
+	 
 }
 start_debug(){
 	echo "starting debug"
-	$ERL    $HOME_P  -s $APP  -kernel error_logger false    -boot start_sasl  -$TYPE debug_$NODE@$HOST_TEST -config sys
+	echo "$ERL    $HOME_P  -s $APP unlinked  -kernel error_logger false    -boot start_sasl  -setcookie mytoken -$TYPE debug_$NODE -config sys"
+	$ERL    $HOME_P  -s $APP   -kernel error_logger false    -boot start_sasl  -setcookie mytoken -$TYPE debug_$NODE@$HOST -config sys -unlinked
 
 
 }

@@ -1,1 +1,1 @@
-erl -name test  -remsh chat1@localhost.localdomain
+erl -name test  -remsh chat1@btc-tradecomua.localdomain
