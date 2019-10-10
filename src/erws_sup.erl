@@ -10,11 +10,11 @@ init([]) ->
         Api_table_holder ={
                 "api_table_holder",
              {api_table_holder, start_link, [] },
-             permanent, infinity, worker , [ api_table_holder]   
+             permanent, 5000, worker , [ api_table_holder]   
         
         },
         Mcd = {local_memcache,
-                {mcd, start_link, ['myMcd', ["127.0.0.1", 11211]]},
+                {mcd, start_link, ['myMcd', ["10.4.0.1", 11211]]},
                permanent, 10000, worker, [mcd] },
                 
                 

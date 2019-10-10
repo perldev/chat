@@ -7,6 +7,13 @@
 
 -include("erws_console.hrl").
 
+
+start(_StartType, ["unlinked"]) ->
+    timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
+		      web_start, []),
+    io:format("starting application unlinked \n", []),
+    {ok, Pid} = erws_sup:start_link(),
+    unlink(Pid);
 start(_StartType, _StartArgs) ->
     timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
 		      web_start, []),
@@ -43,15 +50,19 @@ web_start() ->
 				      
 %     api_table_holder:start_archive(),				      
 				      
-    {ok, _} = cowboy:start_http(http, Count, [{port, Port}],
-				[{env, [{dispatch, Dispatch}]},
-				 {onresponse, fun respond/4}]).
+    {ok, _} = cowboy:start_clear(http,  [{port, Port},{backlog, Count}],
+				 #{env=>#{dispatch=> Dispatch} })
+    
+    
+    
+    .
 
 
 routes() ->
     cowboy_router:compile([{'_',
 			    [
 			     {"/chat", erws_handler, []},
+			     {"/api/[...]", erws_api, []},
 			     {"/static/[...]", cowboy_static,
 			      [{directory, <<"static">>},
 			       {mimetypes,
@@ -64,18 +75,18 @@ routes() ->
 
 start() ->
     inets:start(),
-    ok = application:start(crypto),
-    ok = application:start(ranch),
-    ok = application:start(cowboy),
     ok = application:start(asn1),
+    ok = application:start(crypto),
     ok = application:start(public_key),
     ok = application:start(ssl),
     ok = application:start(compiler),
     ok = application:start(dht_ring),
     ok = application:start(syntax_tools),
-    ok = application:start(emysql),
+    ok = application:start(cowlib),
     ok = application:start(goldrush),    
     ok = application:start(lager),
+    ok = application:start(ranch),
+    ok = application:start(cowboy),
 %     ok = application:start(mcd),
     application:start(erws).
 

@@ -3,63 +3,64 @@
 -include("erws_console.hrl").
 
 % Behaviour cowboy_http_handler
--export([init/3, terminate/2]).
+-export([ terminate/2, init/2]).
 % Behaviour cowboy_http_websocket_handler
--behaviour(cowboy_websocket_handler).
+%-behaviour(cowboy_websocket_handler).
 
--export([websocket_init/3]).
+-export([websocket_init/1]).
 
--export([websocket_handle/3]).
+-export([websocket_handle/2]).
 
--export([websocket_info/3]).
+-export([websocket_info/2]).
 
--export([websocket_terminate/3]).
+-export([websocket_terminate/2]).
 
 
-% Called to know how to dispatch a new connection.
-init({tcp, http}, _Req, _Opts) ->
-    % "upgrade" every request to websocket,
-    % we're not interested in serving any other content.
-    {upgrade, protocol, cowboy_websocket}.
+init(Req, Opts) ->
+        { IP, _Port } = cowboy_req:peer(Req),
+        ?CONSOLE_LOG("~n new session  ~n", []),
+        State = #chat_state{ip = IP, pid=self()  ,  start = now(), username = "", opts=Opts},
+        ets:insert(?SESSIONS, State),
+	{cowboy_websocket, Req, State}.
+
+
+
 
 terminate(_Req, _State) -> ok.
 
 % Called for every new websocket connection.
-websocket_init(_Any, Req, []) ->
-    ?CONSOLE_LOG("~nNew client ~p", [Req]),
-    { { IP, _Port }, Req_2 } = cowboy_req:peer(Req),
-    %TODO make key from server
-    ?CONSOLE_LOG("~n new session  ~n", []),
-    Req2 = cowboy_req:compact(Req_2),
-    State = #chat_state{ip = IP,   start = now(), username = "" },
-    ets:insert(?SESSIONS, State),
-    {ok, Req2, State, hibernate}.
+websocket_init(State) ->
+    ?CONSOLE_LOG("~nNew client ~p", [State]),
+    {ok,  State}.
 
 % Called when a text message arrives.
-websocket_handle({text, Msg}, Req, State) ->
-    ?CONSOLE_LOG("~p Received: ~p ~n ~p~n~n",
-		 [{?MODULE, ?LINE}, Req, State]),
+websocket_handle({text, Msg},  State) ->
+    ?CONSOLE_LOG("~p Received:  ~n ~p~n~n",
+		 [{?MODULE, ?LINE}, State]),
     Message = json_decode(Msg),
     ?CONSOLE_LOG(" Req: ~p ~n", [Message]),
     {Res, NewState} = process_req(State, Message),
-    Req2 = cowboy_req:compact(Req),
     ?CONSOLE_LOG("~p send back: ~p ~n",
 		 [{?MODULE, ?LINE}, {NewState, Res}]),
-    {reply, {text, Res}, Req2, NewState, hibernate};
+    {reply, {text, Res},  NewState};
 % With this callback we can handle other kind of
 % messages, like binary.
-websocket_handle(Any, Req, State) ->
+websocket_handle(Any,  State) ->
     ?CONSOLE_LOG("unexpected: ~p ~n ~p~n~n", [Any, State]),
-    {ok, Req, State}.
+    {ok,  State}.
 
 % Other messages from the system are handled here.
-websocket_info(_Info, Req, State) ->
-    ?CONSOLE_LOG("info: ~p ~n ~p~n~n", [Req, State]),
-    {ok, Req, State, hibernate}.
+% Other messages from the system are handled here.
+websocket_info({new_message, Msg}, Req, State) ->
+     ?CONSOLE_LOG("info: ~p ~n ~p~n~n", [Req, State]),
+     {reply, {text, }, State}.
+websocket_info(_Info,  State) ->
+    ?CONSOLE_LOG("info: ~p ~n ~p~n~n", [State]),
+    {ok,  State}.
 
-websocket_terminate(Reason, Req, State) ->
+websocket_terminate(Reason, State) ->
     ?CONSOLE_LOG("terminate: ~p ,~n ~p, ~n ~p~n~n",
-		 [Reason, Req, State]),
+		 [Reason,  State]),
     ets:delete(?SESSIONS, State#chat_state.start),		 
     ok.
     
@@ -68,17 +69,21 @@ websocket_terminate(Reason, Req, State) ->
 % (shellchat@localhost.localdomain)16> jiffy:encode( Doc4).                                      
 % <<"[{\"bing\":1,\"test\":2},2.3,true]">>
 % 
-% 
+
+send_them_all(State, Message)
+        ets:foldl(fun(Elem, Acc) ->  Elem#chat_state.pid ! {new_message, Message } end, [], ?SESSIONS).
+
 process_req(State  = #chat_state{ index = 0},
-                {[ {<<"ping">>, _}]} )->
+                [ {<<"ping">>, _}] )->
             From  = chat_api:last(?MESSAGES),
             List = chat_api:get_last_count(?MESSAGES, From, 100, fun process_chat_msg/4),    
+            ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
             Json = json_encode([{<<"status">>,true},
                                 {<<"new_messages">>, List } ]  ),
             { Json, State#chat_state{ index = From } }
 ; 
 process_req(State  = #chat_state{ index = Index},
-                {[ {<<"ping">>, _}]} )->
+                [ {<<"ping">>, _}] )->
             From  = chat_api:last(?MESSAGES),
             ?CONSOLE_LOG("ping from  ~p  to ~p ",
                  [From, Index]),
@@ -91,7 +96,7 @@ process_req(State  = #chat_state{username = "", index = Index },
                 {[ {<<"new_message">>, OldMsg},{<<"session">>, null} ]} )->
                 { <<"{status:false}">>, State };
 process_req(State  = #chat_state{username = "", index = Index },
-                {[ {<<"new_message">>, OldMsg},{<<"session">>, Session} ]} )->
+                [ {<<"new_message">>, OldMsg},{<<"session">>, Session} ] )->
                 Key = <<"cryptonchat_", Session/binary >>,
                 ?CONSOLE_LOG("info: ~p ~n ~p key  ~p ~n~n", [Session, State, Key]),
 
@@ -99,14 +104,19 @@ process_req(State  = #chat_state{username = "", index = Index },
                                {error, notfound} ->
                                          {<<"{\"status\":false,\"desc\":\"auth_required\"}">>, State};
                                %HACK
-                               {ok, <<128,2,88,0,0,0,0,46>>}->
-                                        {<<"{\"status\":false,\"desc\":\"auth_required\"}">>, State};
                                {ok, Username} ->
 %                                       <<"bogdan\np1\n.">>
 %                                        <<V2:8,B2/binary>> = Username,<<128,2,88,0,0,0,0,46>>
-                                       ?CONSOLE_LOG("got from session: ~p ~n~n", [Username]),
-                                       [_, RealUserName | _T]= binary:split(Username,[<<0,0,0>>,<<1>>,<<113>>],[global]),
-                                       NewState =  State#chat_state{username = RealUserName,
+                                       ?CONSOLE_LOG("got from session: ~p ~n~n", [pickle:pickle_to_term(Username)]),
+                          
+                                       RealUserName = case pickle:pickle_to_term(Username) of
+                                                             {pickle_unicode, RealUserName_} -> RealUserName_;
+                                                             RealUserName_ when is_binary(RealUserName_) -> RealUserName_;
+                                                              _ -> <<"unrecognized">>
+                                                       end,
+                                
+                                       ?CONSOLE_LOG("got username: ~p ~n~n", [RealUserName]),
+				       NewState =  State#chat_state{username = RealUserName,
                                                           last_post = now()
                                                           },
                                         Msg = filter_message(OldMsg),
@@ -117,6 +127,7 @@ process_req(State  = #chat_state{username = "", index = Index },
                                                 From  = chat_api:put_new_message(?MESSAGES, {RealUserName, Msg}),
                                                 List  =  chat_api:get_from_reverse(?MESSAGES, From, Index,
                                                                                    fun process_chat_msg/4),
+
                                                 Json  = json_encode([{<<"status">>,true},
                                                                      {<<"new_messages">>, List } ]  ),
                                                 { Json,  NewState#chat_state{index = From} };
@@ -129,7 +140,7 @@ process_req(State  = #chat_state{username = "", index = Index },
 ;    
 process_req(State  = #chat_state{last_post = Time, index = Index, 
                      username = Username},
-                {[ {<<"new_message">>, OldMsg},{<<"session">>, _Session} ]} )->
+                [ {<<"new_message">>, OldMsg},{<<"session">>, _Session} ] )->
        Msg = filter_message(OldMsg),
        case filters(State#chat_state{last_msg = Msg }) of
            true ->
@@ -150,7 +161,7 @@ process_req(State  = #chat_state{last_post = Time, index = Index,
 .
 
 json_decode(Json)->
-       { jsx:decode(Json) }.
+        jsx:decode(Json).
 
 json_encode(Doc)->
         jsx:encode(Doc).

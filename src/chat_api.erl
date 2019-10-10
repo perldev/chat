@@ -6,7 +6,8 @@
          system_message/2,
          get_last_count/4,
          delete_firstN_msgs/3,
-         get_firstN_msgs/3
+         get_firstN_msgs/3,
+	 raw_msg/2
          ]).
 
 
@@ -205,3 +206,10 @@ put_new_message(Tab, { Username, MessBin } )->
                           }),
        Ref                   
 .
+
+raw_msg(Tab, Msg )->
+       Ref = erlang:make_ref(),
+       ets:insert( Tab, Msg#message_record{id=Ref}),
+       Ref
+.
+

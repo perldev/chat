@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3 ]).
+-export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1 ]).
 
 -include("erws_console.hrl").
 
@@ -48,8 +48,10 @@ flush_chat()->
 
 flush_chat(Count)->
     gen_server:cast(?MODULE, {flush_chat, Count})      
-.        
-    
+.       
+new_message(Msg)->
+    gen_server:cast(?MODULE, {new_msg, Msg}).      
+
 stop() ->
     gen_server:cast(?MODULE, stop).
  
@@ -57,8 +59,13 @@ stop() ->
 process_to_archive(_Msid,  _Msgtime, Msgusername,  Msgmessage  )->
         emysql:execute(?MYSQL_POOL, stmt_arhive,[Msgmessage, Msgusername])
 .
-    
-    
+
+handle_cast(stop, MyState) ->
+     io:format("somebody wants me dying\n", []),
+    {stop, this_painful_world ,MyState};  
+handle_cast({new_msg, Msg}, MyState) ->
+    chat_api:raw_msg(MyState#monitor.messages, Msg),     
+    {noreply, MyState};   
 handle_cast({flush_chat, Count }, MyState) ->
     chat_api:delete_firstN_msgs(MyState#monitor.messages, Count, fun process_to_archive/4),     
     {noreply, MyState};   
@@ -75,18 +82,18 @@ handle_cast( archive_mysql_start, MyState) ->
     {ok, Size } = application:get_env(erws, archive_size),
     {ok, Interval } = application:get_env(erws, archive_interval),
     
-    timer:apply_interval(Interval, api_table_holder, archive, [ MyState#monitor.messages, MaxSize, Size] ),
+  %  timer:apply_interval(Interval, api_table_holder, archive, [ MyState#monitor.messages, MaxSize, Size] ),
     
  
-    emysql:add_pool(?MYSQL_POOL, [{size,4},
-                     {user, User},
-                     {password, Pwd},
-                     {host, Host},
-                     {database, Base},
-                     {encoding, utf8}]),
+ %   emysql:add_pool(?MYSQL_POOL, [{size,4},
+%                     {user, User},
+ %                    {password, Pwd},
+ %                    {host, Host},
+ %                    {database, Base},
+ %                    {encoding, utf8}]),
 %% TODO change NOW() to the value of ets table                     
-    emysql:prepare(stmt_arhive, 
-                 <<"INSERT INTO main_chathistory(msg, user, pub_date, status) VALUES(?,?, NOW(),\"processed\")">>),
+   % emysql:prepare(stmt_arhive, 
+   %              <<"INSERT INTO main_chathistory(msg, user, pub_date, status) VALUES(?,?, NOW(),\"processed\")">>),
     {noreply, MyState}.
     
 archive(Tab, MaxSize, Size)->
