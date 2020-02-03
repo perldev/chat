@@ -8,7 +8,7 @@ APP=erws_app
 EBIN_DIR=ebin
 HOME_D=deps
 
-HOME_P="-pa $EBIN_DIR  $HOME_D/*/ebin  "
+HOME_P="-pa $EBIN_DIR  $HOME_D/*/ebin _build/default/lib/*/ebin "
 #DOTTED=` | grep '\.'`
 TYPE="name"
  

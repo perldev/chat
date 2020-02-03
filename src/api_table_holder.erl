@@ -2,13 +2,15 @@
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1 ]).
+-export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1, 
+	 clear_online/0, backup_messages/1 ]).
 
 -include("erws_console.hrl").
 
 -record(monitor,{
                   messages,
-                  users
+                  users, 
+		  timer_back
                 }).
 
 
@@ -17,16 +19,51 @@ start_link() ->
           gen_server:start_link({local, ?MODULE},?MODULE, [],[]).
 
 init([]) ->
-        Ets = chat_api:create_store(?MESSAGES),
+
+        Back = application:get_env(erws, messages_file),
+        BackInterval = application:get_env(erws, backup_messages_interval, 3601000),
+        Ets = chat_api:create_store(?MESSAGES, Back),
         EtsSess = ets:new(?SESSIONS, [public, named_table, set, {keypos,2} ] ),
         timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
                           start_archive, []),
-        {ok, #monitor{
+        timer:apply_interval(?INTERVAL_CLEAR, ?MODULE,
+                             clear_online, []),
+        
+	case Back of
+           undefined->
+	    {ok, #monitor{
                         messages = Ets ,
                         users = EtsSess
-                        
-        }
-        }.
+                           
+            } };
+          {ok, FileName}->
+             Timer = timer:apply_interval(BackInterval, ?MODULE,
+                             backup_messages, [FileName]),
+            			 
+	    {ok, #monitor{
+                        messages = Ets ,
+                        users = EtsSess, 
+			timer_back = Timer
+                           
+            } }
+        end		 
+	.
+
+backup_messages(FileName)->
+     ets:tab2file(?MESSAGES, FileName)
+.
+
+
+clear_online()->
+    lists:foreach(fun(E) -> 
+	              Pid =  element(2, E), 
+		      case is_process_alive(Pid) of 
+			   false->  
+	                       ets:delete(?SESSIONS, Pid); 
+			   _-> nothing 
+		      end      
+		  end, ets:tab2list(?SESSIONS)).
+
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

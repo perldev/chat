@@ -2,7 +2,8 @@
 -behaviour(supervisor).  
 -export([start_link/0]).  
 -export([init/1]).  
-  
+-include("erws_console.hrl").
+
 start_link() ->  
         supervisor:start_link({local, ?MODULE}, ?MODULE, []).  
       
@@ -14,7 +15,7 @@ init([]) ->
         
         },
         Mcd = {local_memcache,
-                {mcd, start_link, ['myMcd', ["10.4.0.1", 11211]]},
+                {mcd, start_link, [?LOCAL_CACHE, ["10.4.0.1", 11211]]},
                permanent, 10000, worker, [mcd] },
                 
                 

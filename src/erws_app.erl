@@ -15,6 +15,7 @@ start(_StartType, ["unlinked"]) ->
     {ok, Pid} = erws_sup:start_link(),
     unlink(Pid);
 start(_StartType, _StartArgs) ->
+    application:load(erws),
     timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
 		      web_start, []),
     erws_sup:start_link().
@@ -49,9 +50,14 @@ web_start() ->
 				      count_listeners),
 				      
 %     api_table_holder:start_archive(),				      
-				      
-    {ok, _} = cowboy:start_clear(http,  [{port, Port},{backlog, Count}],
-				 #{env=>#{dispatch=> Dispatch} })
+     case cowboy:start_http(
+                listener, Count,
+                [{port, Port}],
+            [{env, [{dispatch, Dispatch}]}]) of
+              {ok, _} -> ok;
+             {error, {already_started, _}} -> ok;
+             {error, _} = Error -> Error
+	  end		   
     
     
     
