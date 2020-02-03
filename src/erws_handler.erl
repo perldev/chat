@@ -131,10 +131,11 @@ send_them_all(Id)->
 process_req(State  = #chat_state{ index = 0},
                 [ {<<"ping">>, _}] )->
             From  = chat_api:last(?MESSAGES),
-	    
+            {}     = ets:info(?SESSIONS, size),
             List = chat_api:get_last_count(?MESSAGES, From, 100, fun process_chat_msg/4),    
             ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
             Json = json_encode([{<<"status">>,true},
+                                {<<"subscribers">>, Size},
                                 {<<"new_messages">>, List } ]  ),
             { Json, State#chat_state{ index = From } }
 ; 
@@ -143,8 +144,10 @@ process_req(State  = #chat_state{ index = Index},
             From  = chat_api:last(?MESSAGES),
             ?CONSOLE_LOG("ping from  ~p  to ~p ",
                  [From, Index]),
+            {}     = ets:info(?SESSIONS, size),                 
             List = chat_api:get_from_reverse(?MESSAGES, From, Index, fun process_chat_msg/4),    
             Json = json_encode([{<<"status">>,true},
+                                {<<"subscribers">>, Size},
                                 {<<"new_messages">>, [] } ]  ),
             { Json, State#chat_state{ index = From } }
 ;         
