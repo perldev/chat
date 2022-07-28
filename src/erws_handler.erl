@@ -71,26 +71,55 @@ auth_user(CookieSession)->
 % Called for every new websocket connection.
 websocket_init(_Any, Req, []) ->
     { IP, _Port } = cowboy_req:peer(Req),
+    {Path, Req0 }  = cowboy_req:path_info(Req),
+    
     ?CONSOLE_LOG("~nNew client ~p", [Req]),
-     {CookieSession, Req_3} = cowboy_req:qs_val(<<"token">>, Req, undefined), 
+     {CookieSession, Req_3} = cowboy_req:qs_val(<<"token">>, Req0, undefined), 
      UserName = auth_user( CookieSession ),
      ?CONSOLE_LOG(" username ~p ~n",[UserName]),
      ReqRes = cowboy_req:compact(Req_3),
+     case Path of
+	  [<<"chat">>] ->
+		 %%we use default chat for all
+                 State  =#chat_state{ip = IP, pid=self(), start=now(), username = UserName, opts=[], chat=""},
+                 ets:insert(?SESSIONS, State),
+                 {ok,  ReqRes,  State};
+	  [<<"chat">>, Chat] ->
+		 %%we use default chat for all
+                 S = #chat_state{ip = IP, pid=self(), start=now(), username = UserName, opts=[], chat=Chat},
+                 %%ok lets check the state
+		 case ets:lookup(?CHATS, Chat) of 
+		      []-> {stop,  S};%%close connection there is no such chat  
+		      [{Chat, UserName, _User2, _Msgs}]->  
+				 ets:insert(?SESSIONS, S),
+				 {ok,  ReqRes, S};
+		      [{Chat, _User1 ,UserName, _Msgs}]->  
+				 ets:insert(?SESSIONS, S),
+				 {ok,  ReqRes,  S};
+		       _ ->  %it's private chat  only for User1 and User2 and system
+                                 {stop, S}
 
-     State = #chat_state{ip = IP, pid=self()  ,  start = now(), username = UserName, opts=[]},
-     ets:insert(?SESSIONS, State),
-    {ok,  ReqRes,  State}.
+                 end
 
+        end.
 % Called when a text message arrives.
 websocket_handle({text, Msg}, Req, State) ->
     ?CONSOLE_LOG("~p Received:  ~n ~p~n~n ~p",
 		 [{?MODULE, ?LINE}, State, Msg]),
     Message = json_decode(Msg),
     ?CONSOLE_LOG(" Req: ~p ~n", [Message]),
-    {Res, NewState} = process_req(State, Message),
-    ?CONSOLE_LOG("~p send back: ~p ~n",
+    %% choose the chat
+    case ets:lookup(?CHATS, State#chat_state.chat) of
+	[{_Key, _,_,  Ets}] -> 
+             {Res, NewState} = process_req(State, Message, Ets),
+             ?CONSOLE_LOG("~p send back: ~p ~n",
 		 [{?MODULE, ?LINE}, {NewState, Res}]),
-    {reply, {text, Res}, Req,   NewState};
+             {reply, {text, Res}, Req,   NewState};
+        [] ->
+             {stop, State};
+		     
+
+    end
 % With this callback we can handle other kind of
 % messages, like binary.
 websocket_handle(Any, Req,   State) ->
@@ -118,44 +147,54 @@ websocket_terminate(Reason,  Req, State) ->
 % <<"[{\"bing\":1,\"test\":2},2.3,true]">>
 % 
 
-send_them_all(Id)->
-       case chat_api:get_msg(?MESSAGES, Id) of
-	       {Time, Username, Msg} ->  ets:foldl(fun(Elem, Acc) ->  
-                                                                   ?CONSOLE_LOG("send message with this id: ~p to ~p ~n~n", [Id, Elem#chat_state.pid]),
-								    Elem#chat_state.pid ! {new_message,  json_encode([{<<"status">>, true}, {<<"new_messages">>, [ process_chat_msg(Id, Time, Username, Msg) ] }]) } end, [], ?SESSIONS);
+send_them_all({Time, Username, Msg}, Chat)->
+	       ets:foldl(fun(Elem, Acc) ->  
+                           case Elem#chat_state.chat of
+                                Chat ->
+                                    ?CONSOLE_LOG("send message with this id: ~p to ~p ~n~n", [Id, Elem#chat_state.pid]),
+			             Elem#chat_state.pid ! {new_message,  json_encode([{<<"status">>, true}, {<<"new_messages">>, [ process_chat_msg(Id, Time, Username, Msg) ] }]) };
+			         _ ->
+                                   ?CONSOLE_LOG("this message is not for ~p", [Elem])
+			     end
+	        end, [], ?SESSIONS).
+	                                                                 
 
-	         _ ->
-                     ?CONSOLE_LOG("no message with this id: ~p ~n~n", [Id])
-	end.
 
 process_req(State  = #chat_state{ index = 0},
-                [ {<<"ping">>, _}] )->
-            From  = chat_api:last(?MESSAGES),
+                [ {<<"ping">>, _}], Ets )->
+            From  = chat_api:last(Ets),
             Size   = ets:info(?SESSIONS, size),
-            List = chat_api:get_last_count(?MESSAGES, From, 100, fun process_chat_msg/4),    
+            List = chat_api:get_last_count(Ets, From, 100, fun process_chat_msg/4),    
             ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
             Json = json_encode([{<<"status">>,true},
                                 {<<"subscribers">>, Size},
                                 {<<"new_messages">>, List } ]  ),
             { Json, State#chat_state{ index = From } }
-; 
+;
+
+
+
+
+
+
 process_req(State  = #chat_state{ index = Index},
-                [ {<<"ping">>, _}] )->
-            From  = chat_api:last(?MESSAGES),
+                [ {<<"ping">>, _}], Ets )->
+            From  = chat_api:last(Ets),
             ?CONSOLE_LOG("ping from  ~p  to ~p ",
                  [From, Index]),
             Size    = ets:info(?SESSIONS, size),                 
-            List = chat_api:get_from_reverse(?MESSAGES, From, Index, fun process_chat_msg/4),    
+            List = chat_api:get_from_reverse(Ets, From, Index, fun process_chat_msg/4),    
             Json = json_encode([{<<"status">>,true},
                                 {<<"subscribers">>, Size},
                                 {<<"new_messages">>, [] } ]  ),
             { Json, State#chat_state{ index = From } }
 ;         
 process_req(State  = #chat_state{username = "", index = Index },
-                {[ {<<"new_message">>, OldMsg},{<<"session">>, null} ]} )->
+                {[ {<<"new_message">>, OldMsg},{<<"session">>, null} ]}, _Ets )->
                 { <<"{status:false}">>, State };
-process_req(State  = #chat_state{username = "", index = Index },
-                [ {<<"new_message">>, OldMsg},{<<"session">>, Session} ] )->
+process_req(State  = #chat_state{username = "", index = Index},
+                [ {<<"new_message">>, OldMsg},
+                  {<<"session">>, Session} ], Ets )->
                 Key = <<"cryptonchat_", Session/binary >>,
                 ?CONSOLE_LOG("info: ~p ~n ~p key  ~p ~n~n", [Session, State, Key]),
 
@@ -183,8 +222,9 @@ process_req(State  = #chat_state{username = "", index = Index },
                                                                       last_post = {0,0,0},
                                                                       username = RealUserName }) of
                                              true ->
-                                                From  = chat_api:put_new_message(?MESSAGES, {RealUserName, Msg}),
-                                                send_them_all(From),
+                                                From  = chat_api:put_new_message(Ets, {RealUserName, Msg}),
+						StoredMsg  = chat_api:get_msg(Ets, From),
+                                                send_them_all(StoredMsg, State#chat_state.chat),
                                                 Json  = json_encode([{<<"status">>,true},{<<"new_messages">> ,[] } ]),
                                                 { Json,  NewState#chat_state{index = From} };
                                              false->
@@ -196,13 +236,15 @@ process_req(State  = #chat_state{username = "", index = Index },
 ;    
 process_req(State  = #chat_state{last_post = Time, index = Index, 
                      username = Username},
-                [ {<<"new_message">>, OldMsg},{<<"session">>, _Session} ] )->
+                [ {<<"new_message">>, OldMsg},{<<"session">>, _Session} ], Ets )->
        Msg = filter_message(OldMsg),
        case filters(State#chat_state{last_msg = Msg }) of
            true ->
 
-                From  = chat_api:put_new_message(?MESSAGES, {Username, Msg}),
-                send_them_all(From),
+                From  = chat_api:put_new_message(Ets, {Username, Msg}),
+	        StoredMsg  = chat_api:get_msg(Ets, From),
+                send_them_all(StoredMsg, State#chat_state.chat),
+
                 Json = json_encode([{<<"status">>,true}, 
 				     {<<"new_messages">>, []}
 				     ]),                     

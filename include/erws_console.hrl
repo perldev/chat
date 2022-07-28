@@ -16,7 +16,7 @@
 -define(ADMIN_KEY, <<"tass_token">> ).
 -define(KEY_PREFIX, "crypton" ).
 -define(LOCAL_CACHE, 'myMcd').
-
+-define(CHATS, chats).
 
 
 
@@ -32,7 +32,8 @@
                username = "",
                ip,
                last_msg,
-	       opts
+	       opts,
+	       chat=undefined
         }
 
 ).

@@ -20,9 +20,6 @@ clean:
 only_prolog: clean_prolog get-deps compile
 
 
-clean_prolog: 
-	rm -Rf deps/prolog_open_api
-	rm -Rf deps/eprolog
 
 tests: eunit ct
 

@@ -24,6 +24,9 @@ init([]) ->
         BackInterval = application:get_env(erws, backup_messages_interval, 3601000),
         Ets = chat_api:create_store(?MESSAGES, Back),
         EtsSess = ets:new(?SESSIONS, [public, named_table, set, {keypos,2} ] ),
+        EtsSess1 = ets:new(?CHATS, [public, named_table, set ] ),
+	ets:insert(?CHATS, {"", undefined, undefined, Ets}), %% insert default store for main chat
+
         timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
                           start_archive, []),
         timer:apply_interval(?INTERVAL_CLEAR, ?MODULE,

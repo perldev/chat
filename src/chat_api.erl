@@ -2,13 +2,15 @@
 -export([last/1,
          get_from_reverse/4, 
          put_new_message/2,
+	 create_store/1,
          create_store/2,
          system_message/2,
          get_last_count/4,
          delete_firstN_msgs/3,
          get_firstN_msgs/3,
 	 get_msg/2,
-	 raw_msg/2
+	 raw_msg/2,
+	 to_atom/1
          ]).
 
 
@@ -32,6 +34,8 @@ system_message(Tab,  Msg)->
                           }),
        Ref                   
 .
+create_store(Tab)->
+	create_store(Tab, undefined).
 
 create_store(Tab, {ok, FileName})->
         ets:file2tab(FileName)
@@ -224,4 +228,8 @@ raw_msg(Tab, Msg )->
        ets:insert( Tab, Msg#message_record{id=Ref}),
        Ref
 .
+
+  when is_binary(E)
+to_atom(E)->
+   unicode
 
