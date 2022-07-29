@@ -229,7 +229,12 @@ raw_msg(Tab, Msg )->
        Ref
 .
 
-  when is_binary(E)
-to_atom(E)->
-   unicode
+to_atom(E) when is_integer(E)->
+  E1 = integer_to_list(E),
+  to_atom(E).
+to_atom(E)   when is_binary(E)->
+  E1 = binary:bin_to_list(E),
+  to_atom(E1).
+to_atom(E) when is_list(E)->
+  list_to_atom(E).
 
