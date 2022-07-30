@@ -87,6 +87,11 @@ process([?ADMIN_KEY,<<"post">>, Username],  Body, Req)->
      chat_api:put_new_message(?MESSAGES, {Username, Echo}),
      ?CONSOLE_LOG("request  post from ~p ~n",[Req]),
      true_response(Req);
+process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
+     Echo = proplists:get_value(<<"msg">>, Body),      
+     chat_api:put_new_message(?MESSAGES, {Username, Echo}),
+     ?CONSOLE_LOG("request  post from ~p ~n",[Req]),
+     true_response(Req);
 process(_, _Body, Req)->
      ?CONSOLE_LOG("undefined request from ~p ~n",[Req]),
      false_response(Req).
