@@ -119,7 +119,7 @@ websocket_handle({text, Msg}, Req, State) ->
              {stop, State};
 		     
 
-    end
+    end;
 % With this callback we can handle other kind of
 % messages, like binary.
 websocket_handle(Any, Req,   State) ->
