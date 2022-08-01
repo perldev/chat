@@ -151,8 +151,8 @@ send_them_all({Time, Username, Msg}, Chat)->
 	       ets:foldl(fun(Elem, Acc) ->  
                            case Elem#chat_state.chat of
                                 Chat ->
-                                    ?CONSOLE_LOG("send message with this id: ~p to ~p ~n~n", [Id, Elem#chat_state.pid]),
-			             Elem#chat_state.pid ! {new_message,  json_encode([{<<"status">>, true}, {<<"new_messages">>, [ process_chat_msg(Id, Time, Username, Msg) ] }]) };
+                                    ?CONSOLE_LOG("send message with this id: ~p to ~p ~n~n", [{Username, Msg}, Elem#chat_state.pid]),
+			             Elem#chat_state.pid ! {new_message,  json_encode([{<<"status">>, true}, {<<"new_messages">>, [ process_chat_msg(0, Time, Username, Msg) ] }]) };
 			         _ ->
                                    ?CONSOLE_LOG("this message is not for ~p", [Elem])
 			     end
