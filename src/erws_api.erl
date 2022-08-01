@@ -53,20 +53,15 @@ false_response(Req)->
 true_response(Req)->
    {raw_answer, {200, <<"{\"status\":\"true\"}">>, headers_json_plain() },  Req}.
 
-process([?ADMIN_KEY, <<"chat">>, <<"create">>, Key], _Body, Req) ->
+process([?ADMIN_KEY, <<"chat">>, <<"create">>, Key], Body, Req) ->
      ?CONSOLE_LOG("create chat for  ~p ~n",[Req]),
      
      {User1, Req_1} = cowboy_req:qs_val(<<"user1">>, Req, undefined),
      {User2, Req_2} = cowboy_req:qs_val(<<"user2">>, Req_1, undefined),
-     Echo = proplists:get_value(<<"msg">>, Body, undefined),     
-     case Echo of 
-         undefined -> true_response(Req_2);
-	 _ ->
-         KeyA  = chat_api:to_atom(Key),
-         Ets = chat_api:create_store(KeyA),
-         ets:insert(?CHATS, {Key, User1, User2, Ets}), 
-         true_response(Req_2)
-    end
+     KeyA  = chat_api:to_atom(Key),
+     Ets = chat_api:create_store(KeyA),
+     ets:insert(?CHATS, {Key, User1, User2, Ets}), 
+     true_response(Req_2)
 ;
 process([?ADMIN_KEY,<<"unban">>,Username],  _Body, Req)->
      ?CONSOLE_LOG("undefined ban from ~p ~n",[Req]),
