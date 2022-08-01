@@ -116,7 +116,7 @@ websocket_handle({text, Msg}, Req, State) ->
 		 [{?MODULE, ?LINE}, {NewState, Res}]),
              {reply, {text, Res}, Req,   NewState};
         [] ->
-             {stop, State};
+             {stop, State}
 		     
 
     end;
