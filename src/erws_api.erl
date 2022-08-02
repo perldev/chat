@@ -60,8 +60,8 @@ process([?ADMIN_KEY, <<"chat">>, <<"create">>, Key], Body, Req) ->
      {User2, Req_2} = cowboy_req:qs_val(<<"user2">>, Req_1, undefined),
      KeyA  = chat_api:to_atom(Key),
      %% TODO check the duplication of p2p chats
-     Ets = chat_api:create_store(KeyA),
-     ets:insert(?CHATS, {Key, User1, User2, Ets}), 
+     api_table_holder:create_store(KeyA),
+     ets:insert(?CHATS, {Key, User1, User2, KeyA}), 
      true_response(Req_2)
 ;
 process([?ADMIN_KEY,<<"unban">>,Username],  _Body, Req)->

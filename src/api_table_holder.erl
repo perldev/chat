@@ -3,7 +3,7 @@
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1, 
-	 clear_online/0, backup_messages/1 ]).
+	 clear_online/0, backup_messages/1, create_store/1 ]).
 
 -include("erws_console.hrl").
 
@@ -106,6 +106,9 @@ handle_cast(stop, MyState) ->
     {stop, this_painful_world ,MyState};  
 handle_cast({new_msg, Msg}, MyState) ->
     chat_api:raw_msg(MyState#monitor.messages, Msg),     
+    {noreply, MyState};   
+handle_cast({create_store, Atom}, MyState) ->
+    chat_api:create_store(Atom), 
     {noreply, MyState};   
 handle_cast({flush_chat, Count }, MyState) ->
     chat_api:delete_firstN_msgs(MyState#monitor.messages, Count, fun process_to_archive/4),     
