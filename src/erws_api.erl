@@ -92,10 +92,28 @@ process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
                 true_response(Req);
 	 []-> false_response(Req)
      end;
+process([?ADMIN_KEY, <<"messages">>,  Chat],  _Body, Req)->
+     ?CONSOLE_LOG("request  get messages from ~p to ~p ~n",[Req, Chat ]),
+     case ets:lookup(?CHATS, Chat)  of 
+	 [{Chat, _U1,_U2, Ets}]->
+		     From  = chat_api:last(Ets),
+                     List = chat_api:get_last_count(Ets, From, 65000, fun process_chat_msg/4),   
+		     ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
+                     Json = json_encode([{<<"status">>,true},
+				         {<<"new_messages">>, List } ]),
+								                 
+                     {json, Json, Req }
+
+	 []-> false_response(Req)
+     end.
+
 process(_, _Body, Req)->
      ?CONSOLE_LOG("undefined request from ~p ~n",[Req]),
      false_response(Req).
 
+
+process_chat_msg(D1,D2,D3,D3)->
+	erws_handler:process_chat_msg(D1,D2,D3,D4).
 
 
      

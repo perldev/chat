@@ -96,6 +96,9 @@ new_message(Msg)->
 stop() ->
     gen_server:cast(?MODULE, stop).
  
+create_store(Atom) ->
+    gen_server:cast(?MODULE, {create_store, Atom}).
+	
  
 process_to_archive(_Msid,  _Msgtime, Msgusername,  Msgmessage  )->
         emysql:execute(?MYSQL_POOL, stmt_arhive,[Msgmessage, Msgusername])
