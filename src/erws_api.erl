@@ -59,7 +59,8 @@ process([?ADMIN_KEY, <<"chat">>, <<"create">>, Key], Body, Req) ->
      {User1, Req_1} = cowboy_req:qs_val(<<"user1">>, Req, undefined),
      {User2, Req_2} = cowboy_req:qs_val(<<"user2">>, Req_1, undefined),
      KeyA  = chat_api:to_atom(Key),
-     Ets = chat_api:create_store(KeyA),
+     %% TODO check the duplication of p2p chats
+     Ets = chat_api:create_store(Key),
      ets:insert(?CHATS, {Key, User1, User2, Ets}), 
      true_response(Req_2)
 ;
@@ -83,10 +84,14 @@ process([?ADMIN_KEY,<<"post">>, Username],  Body, Req)->
      ?CONSOLE_LOG("request  post from ~p ~n",[Req]),
      true_response(Req);
 process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
-     Echo = proplists:get_value(<<"msg">>, Body),      
-     chat_api:put_new_message(?MESSAGES, {Username, Echo}),
-     ?CONSOLE_LOG("request  post from ~p ~n",[Req]),
-     true_response(Req);
+     Echo = proplists:get_value(<<"msg">>, Body),    
+     ?CONSOLE_LOG("request  post from ~p to ~p msg ~p ~n",[Req, Chat, Echo]),
+     case ets:lookup(?CHATS, Chat)  of 
+	 [{Chat, _U1,_U2, Ets}]->
+		chat_api:put_new_message(Ets, {Username, Echo}),
+                true_response(Req);
+	 []-> false_response(Req)
+     end;
 process(_, _Body, Req)->
      ?CONSOLE_LOG("undefined request from ~p ~n",[Req]),
      false_response(Req).
