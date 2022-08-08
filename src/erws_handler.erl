@@ -79,12 +79,12 @@ websocket_init(_Any, Req, []) ->
      ?CONSOLE_LOG(" username ~p ~n",[UserName]),
      ReqRes = cowboy_req:compact(Req_3),
      case Path of
-	  [<<"chat">>] ->
+	  [] ->
 		 %%we use default chat for all
                  State  =#chat_state{ip = IP, pid=self(), start=now(), username = UserName, opts=[], chat=""},
                  ets:insert(?SESSIONS, State),
                  {ok,  ReqRes,  State};
-	  [<<"chat">>, Chat] ->
+	  [ Chat ]  ->
 		 %%we use default chat for all
                  S = #chat_state{ip = IP, pid=self(), start=now(), username = UserName, opts=[], chat=Chat},
                  %%ok lets check the state
