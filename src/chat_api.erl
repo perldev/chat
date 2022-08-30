@@ -1,6 +1,6 @@
 -module(chat_api).
 
--include("erws_console.hrl")
+-include("erws_console.hrl").
 -export([last/1,
          get_from_reverse/4, 
          put_new_message/2,

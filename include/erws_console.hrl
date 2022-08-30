@@ -18,17 +18,13 @@
 -define(LOCAL_CACHE, 'myMcd').
 -define(CHATS, chats).
 
-
-
--record(message_record,
-	                {
-			  id,
-			  time,
-			  username,
-			  message
-		        }
+-record(message_record,{
+			id,
+			time,
+			username,
+			message
+		       }
        ).
-
 
 
 -record(
