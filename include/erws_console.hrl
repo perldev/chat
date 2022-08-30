@@ -20,6 +20,14 @@
 
 
 
+-record(message_record,
+	                {
+			  id,
+			  time,
+			  username,
+			  message
+		        }
+       ).
 
 
 

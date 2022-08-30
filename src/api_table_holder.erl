@@ -3,14 +3,15 @@
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1, 
-	 clear_online/0, backup_messages/1, create_store/1 ]).
+	 clear_online/0, backup_messages/1, create_store/2, create_store/1, save_chat/2,restore_chat/1 ]).
 
 -include("erws_console.hrl").
 
 -record(monitor,{
                   messages,
                   users, 
-		  timer_back
+		  timer_back,
+		  mysql_pid
                 }).
 
 
@@ -33,29 +34,48 @@ init([]) ->
         timer:apply_interval(?INTERVAL_CLEAR, ?MODULE,
                              clear_online, []),
         
-	case Back of
-           undefined->
-	    {ok, #monitor{
-                        messages = Ets ,
-                        users = EtsSess
-                           
-            } };
-          {ok, FileName}->
-             Timer = timer:apply_interval(BackInterval, ?MODULE,
-                             backup_messages, [FileName]),
+        Timer = timer:apply_interval(BackInterval, ?MODULE,
+                             backup_messages, []),
             			 
-	    {ok, #monitor{
+	{ok, #monitor{
                         messages = Ets ,
                         users = EtsSess, 
 			timer_back = Timer
                            
-            } }
-        end		 
+        } }
 	.
 
-backup_messages(FileName)->
-     ets:tab2file(?MESSAGES, FileName)
+restore_chat(Ref)->
+     Result = gen_server:call(?MODULE, {restore_chat, Ref}),
+%   {<<"ref">>, Cht},
+%   {<<"user1">>, U1},
+%   {<<"ets">>, chat_api:to_binary(Ets) },
+%   {<<"user2">>, U2}
+%   {<<"messages">>, List }		 
+    List  = erws_api:json_decode(Result),
+    U1 = proplists:get_value(<<"user1">>),
+    U2 = proplists:get_value(<<"user2">>),
+    Ets = proplists:get_value(<<"ets">>),
+    Ref = proplists:get_value(<<"ref">>),
+    Messages = proplists:get_value(<<"messages">>),
+    EtsA = chat_api:to_atom(Ets),
+    api_table_holder:create_store(EtsA, Messages),
+    ets:insert(?CHATS, {Ref, U1, U2, EtsA}),
+    true.
+%% insert default store for main chat
+
+    
+
+    
+
+            
 .
+
+
+backup_messages()->
+    gen_server:cast(?MODULE, backup)	
+.
+
 
 
 clear_online()->
@@ -72,6 +92,17 @@ clear_online()->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+
+
+
+handle_call({restore_chat, Ref}, MyState)->
+   Pid = MyState#monitor.mysql_pid, 
+   Result = mysql:query(Pid, <<"SELECT history FROM  chats WHERE ref=?">>, [Ref]), 
+
+
+   {reply, Result, MyState};  
+
 handle_call(status,_From ,State) ->
     ?LOG_DEBUG("get msg call ~p ~n", [status]),
     {reply, {   ets:tab2list(State#monitor.messages), ets:tab2list(State#monitor.users) } ,State};
@@ -84,8 +115,11 @@ start_archive()->
       gen_server:cast(?MODULE, archive_mysql_start).  
 
 flush_chat()->
-    gen_server:cast(?MODULE, {flush_chat, ?DEFAULT_FLUSH_SIZE})   
+      gen_server:cast(?MODULE, {flush_chat, ?DEFAULT_FLUSH_SIZE})   
 .
+save_chat(History, Ref)->
+    gen_server:cast(?MODULE, {save_chat, Ref, History})   
+.	
 
 flush_chat(Count)->
     gen_server:cast(?MODULE, {flush_chat, Count})      
@@ -95,24 +129,39 @@ new_message(Msg)->
 
 stop() ->
     gen_server:cast(?MODULE, stop).
- 
-create_store(Atom) ->
-    gen_server:cast(?MODULE, {create_store, Atom}).
+
+create_store(Atom)->
+	create_store(Atom,[]).
+
+create_store(Atom, List) ->
+    gen_server:cast(?MODULE, {create_store, Atom, List}).
 	
  
 process_to_archive(_Msid,  _Msgtime, Msgusername,  Msgmessage  )->
         emysql:execute(?MYSQL_POOL, stmt_arhive,[Msgmessage, Msgusername])
 .
 
+handle_cast(backup, MyState)->
+    L = ets:tab2list(?CHATS),
+    lists:foreach(fun({Chat, _U1, U2_, _Ets}) -> spawn_link(erws_api, backup_chat, [Chat])  end, L),
+    {noreply, MyState};
 handle_cast(stop, MyState) ->
      io:format("somebody wants me dying\n", []),
     {stop, this_painful_world ,MyState};  
 handle_cast({new_msg, Msg}, MyState) ->
     chat_api:raw_msg(MyState#monitor.messages, Msg),     
     {noreply, MyState};   
-handle_cast({create_store, Atom}, MyState) ->
-    chat_api:create_store(Atom), 
-    {noreply, MyState};   
+handle_cast({create_store, Atom, L}, MyState) ->
+    chat_api:create_store(Atom),
+     %[{<<"time">>, TimeSecs}, {<<"username">>,Username}, {<<"message">>,Msg}]
+    Objs = lists:map(chat_api:from_json/1, L),
+    ets:insert(Atom, Objs),
+    {noreply, MyState};  
+handle_cast({save_chat, Ref, History}, MyState)->
+   Pid = MyState#monitor.mysql_pid, 	
+   mysql:query(Pid, <<"INSERT INTO chats(ref, history) VALUES (?,?)
+		       ON DUPLICATE KEY UPDATE  history=? ">>, [History, Ref, History]), 
+   {noreply, MyState};  
 handle_cast({flush_chat, Count }, MyState) ->
     chat_api:delete_firstN_msgs(MyState#monitor.messages, Count, fun process_to_archive/4),     
     {noreply, MyState};   
@@ -130,18 +179,14 @@ handle_cast( archive_mysql_start, MyState) ->
     {ok, Interval } = application:get_env(erws, archive_interval),
     
   %  timer:apply_interval(Interval, api_table_holder, archive, [ MyState#monitor.messages, MaxSize, Size] ),
-    
+   
+    {ok, Pid} = mysql:start_link([{host, Host}, {user,  User},
+                                  {password, Pwd}, {database, Base}
+                                  ]),
+
+
  
- %   emysql:add_pool(?MYSQL_POOL, [{size,4},
-%                     {user, User},
- %                    {password, Pwd},
- %                    {host, Host},
- %                    {database, Base},
- %                    {encoding, utf8}]),
-%% TODO change NOW() to the value of ets table                     
-   % emysql:prepare(stmt_arhive, 
-   %              <<"INSERT INTO main_chathistory(msg, user, pub_date, status) VALUES(?,?, NOW(),\"processed\")">>),
-    {noreply, MyState}.
+    {noreply, MyState#monitor{mysql_pid=Pid}}.
     
 archive(Tab, MaxSize, Size)->
         case MaxSize < ets:info(Tab, size) of

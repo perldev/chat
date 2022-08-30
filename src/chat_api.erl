@@ -1,4 +1,6 @@
 -module(chat_api).
+
+-include("erws_console.hrl")
 -export([last/1,
          get_from_reverse/4, 
          put_new_message/2,
@@ -8,9 +10,12 @@
          get_last_count/4,
          delete_firstN_msgs/3,
          get_firstN_msgs/3,
+	 get_all_msgs/2,
 	 get_msg/2,
 	 raw_msg/2,
-	 to_atom/1
+	 to_atom/1, 
+	 to_binary/1, 
+	 from_json/1
          ]).
 
 
@@ -48,6 +53,28 @@ last(Tab)->
         ets:last(Tab)
 .
 
+     %[{<<"time">>, TimeSecs}, {<<"username">>,Username}, {<<"message">>,Msg}]
+     %
+
+from_json(KeyL)->
+   Time = propslist:get_value(KeyL, <<"time">>), 
+   Username = propslist:get_value(KeyL, <<"username">>),
+   Message = propslist:get_value(KeyL, <<"messsage">>),
+   % TimeSecs = (Mega * 1000000) + Sec,
+   Mega = trunc(Time/1000000),
+   Secs = Time rem 1000000,
+   #message_record{id=erlang:make_ref(), time={Mega, Secs, 0 }, username=Username, message=Message}.
+
+
+
+get_all_msgs(Tab, ProcessFun)->
+ List = ets:tab2list(Tab),
+ lists:map(fun(Msg)-> ProcessFun( Msg#message_record.id,
+				  Msg#message_record.time,
+				  Msg#message_record.username,
+				  Msg#message_record.message
+				) end, List )
+.
 
 get_last_count(Tab, From, Count, Fun)->
            RevesedList  =
@@ -223,11 +250,21 @@ get_msg(Tab, Id)->
 
 
 
+
 raw_msg(Tab, Msg )->
        Ref = erlang:make_ref(),
        ets:insert( Tab, Msg#message_record{id=Ref}),
        Ref
 .
+
+
+
+to_binary(E) when is_integer(E)->
+	to_binary(integer_to_list(E));
+to_binary(E) when is_atom(E)->
+	to_binary(atom_to_list(E));
+to_binary(E) when is_list(E)->
+	list_to_binary(E)
 
 to_atom(E) when is_integer(E)->
   E1 = integer_to_list(E),

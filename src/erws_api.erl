@@ -4,7 +4,7 @@
 
 
 % Behaviour cowboy_http_handler
--export([init/3, hexstring/1, generate_key/2 ]).
+-export([init/3, hexstring/1, generate_key/2, backup_chat/1, json_decode/1, json_encode/1 ]).
 
 
 
@@ -92,6 +92,16 @@ process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
                 true_response(Req);
 	 []-> false_response(Req)
      end;
+
+process([?ADMIN_KEY, <<"save">>,  Chat],  _Body, Req)->
+     ?CONSOLE_LOG("request  get messages from ~p to ~p ~n",[Req, Chat ]),
+     case backup_chat(Chat)  of 
+	 undefined-> false_response(Req);
+	 Json ->
+              {json, Json, Req };
+
+     end
+;
 process([?ADMIN_KEY, <<"messages">>,  Chat],  _Body, Req)->
      ?CONSOLE_LOG("request  get messages from ~p to ~p ~n",[Req, Chat ]),
      case ets:lookup(?CHATS, Chat)  of 
@@ -104,16 +114,35 @@ process([?ADMIN_KEY, <<"messages">>,  Chat],  _Body, Req)->
 								                 
                      {json, Json, Req }
 
-	 []-> false_response(Req)
+	 []->  false_response(Req)
      end.
 
 process(_, _Body, Req)->
      ?CONSOLE_LOG("undefined request from ~p ~n",[Req]),
      false_response(Req).
 
+backup_chat(Cht)->
+     case ets:lookup(?CHATS, Cht)  of 
+	 [{Cht, U1, U2, Ets}]->
+              List = chat_api:get_all_msgs(Ets, fun process_chat_msg/4),   
+              Json = json_encode([
+				  {<<"ref">>, Cht},
+				  {<<"user1">>, chat_api:to_binary(U1)},
+				  {<<"ets">>, chat_api:to_binary(Ets) },
+				  {<<"user2">>, chat_api:to_binary(U2)}
+				  {<<"messages">>, List } 
+				 ]),
+              api_table_holder:save_chat(Cht, Json),
+	      Json;
+	 []-> undefined
+     end
+.
+
 
 process_chat_msg(D1,D2,D3,D3)->
 	erws_handler:process_chat_msg(D1,D2,D3,D4).
+
+
 
 
      
