@@ -90,7 +90,15 @@ websocket_init(_Any, Req, []) ->
                  S = #chat_state{ip = IP, pid=self(), start=now(), username = UserName, opts=[], chat=Chat},
                  %%ok lets check the state
 		 case ets:lookup(?CHATS, Chat) of 
-		      []-> {stop,  S};%%close connection there is no such chat  
+		      []->  
+                               %% try restore first
+                               case api_table_holder:restore_chat(Chat) of 
+                                    true  -> 
+				         ets:insert(?SESSIONS, S),
+      				         {ok,  ReqRes, S};
+                                    false ->
+                                         {stop,  S}%%close connection there is no such chat  
+                               end;
 		      [{Chat, UserName, _User2, _Msgs}]->  
 				 ets:insert(?SESSIONS, S),
 				 {ok,  ReqRes, S};
