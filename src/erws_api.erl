@@ -112,7 +112,7 @@ process([?ADMIN_KEY, <<"messages">>,  Chat],  _Body, Req)->
                      Json = json_encode([{<<"status">>,true},
 				         {<<"new_messages">>, List } ]),
 								                 
-                     {json, Json, Req }
+                     {json, Json, Req };
 
 	 []->  false_response(Req)
      end.
@@ -139,7 +139,7 @@ backup_chat(Cht)->
 .
 
 
-process_chat_msg(D1,D2,D3,D3)->
+process_chat_msg(D1,D2,D3,D4)->
 	erws_handler:process_chat_msg(D1,D2,D3,D4).
 
 
