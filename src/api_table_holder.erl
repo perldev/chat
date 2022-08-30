@@ -46,13 +46,15 @@ init([]) ->
 	.
 
 restore_chat(Ref)->
-     Result = gen_server:call(?MODULE, {restore_chat, Ref}),
+    Result = gen_server:call(?MODULE, {restore_chat, Ref}),
+    {ok, _Cols, [[Json]]} = Result,
+
 %   {<<"ref">>, Cht},
 %   {<<"user1">>, U1},
 %   {<<"ets">>, chat_api:to_binary(Ets) },
 %   {<<"user2">>, U2}
 %   {<<"messages">>, List }		 
-    List  = erws_api:json_decode(Result),
+    List  = erws_api:json_decode(Json),
     U1 = proplists:get_value(<<"user1">>),
     U2 = proplists:get_value(<<"user2">>),
     Ets = proplists:get_value(<<"ets">>),
