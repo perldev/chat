@@ -60,7 +60,8 @@ auth_user(CookieSession)->
 		            case SessionObj of 
 		                undefined -> "";
 		                SessionObj ->
-		                   case get_key_dict(SessionObj, <<"username">>, false) of
+		                   case get_key_dict(SessionObj, {pickle_unicode, <<"username">> }, false) of
+
 		                             false ->  "";
 					     {pickle_unicode, Username} -> Username 
 		                   end
@@ -158,7 +159,6 @@ send_them_all({Time, Username, Msg}, Chat)->
 			     end
 	        end, [], ?SESSIONS).
 	                                                                 
-
 
 process_req(State  = #chat_state{ index = 0},
                 [ {<<"ping">>, _}], Ets )->

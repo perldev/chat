@@ -3,7 +3,7 @@
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1, 
-	 clear_online/0, backup_messages/1, create_store/2, create_store/1, save_chat/2,restore_chat/1 ]).
+	 clear_online/0, backup_messages/0, create_store/2, create_store/1, save_chat/2,restore_chat/1 ]).
 
 -include("erws_console.hrl").
 
@@ -64,15 +64,6 @@ restore_chat(Ref)->
     api_table_holder:create_store(EtsA, Messages),
     ets:insert(?CHATS, {Ref, U1, U2, EtsA}),
     true.
-%% insert default store for main chat
-
-    
-
-    
-
-            
-.
-
 
 backup_messages()->
     gen_server:cast(?MODULE, backup)	
@@ -98,13 +89,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 
-handle_call({restore_chat, Ref}, MyState)->
+handle_call({restore_chat, Ref},_From, MyState)->
    Pid = MyState#monitor.mysql_pid, 
    Result = mysql:query(Pid, <<"SELECT history FROM  chats WHERE ref=?">>, [Ref]), 
-
-
    {reply, Result, MyState};  
-
 handle_call(status,_From ,State) ->
     ?LOG_DEBUG("get msg call ~p ~n", [status]),
     {reply, {   ets:tab2list(State#monitor.messages), ets:tab2list(State#monitor.users) } ,State};
@@ -156,7 +144,7 @@ handle_cast({new_msg, Msg}, MyState) ->
 handle_cast({create_store, Atom, L}, MyState) ->
     chat_api:create_store(Atom),
      %[{<<"time">>, TimeSecs}, {<<"username">>,Username}, {<<"message">>,Msg}]
-    Objs = lists:map(chat_api:from_json/1, L),
+    Objs = lists:map(fun(E) -> chat_api:from_json(E) end, L),
     ets:insert(Atom, Objs),
     {noreply, MyState};  
 handle_cast({save_chat, Ref, History}, MyState)->

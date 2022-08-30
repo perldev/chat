@@ -89,7 +89,7 @@ start() ->
     ok = application:start(compiler),
     ok = application:start(dht_ring),
     ok = application:start(syntax_tools),
-%    ok = application:start(cowlib),
+    ok = application:start(cowlib),
     ok = application:start(goldrush),    
     ok = application:start(lager),
     ok = application:start(ranch),

@@ -98,7 +98,7 @@ process([?ADMIN_KEY, <<"save">>,  Chat],  _Body, Req)->
      case backup_chat(Chat)  of 
 	 undefined-> false_response(Req);
 	 Json ->
-              {json, Json, Req };
+              {json, Json, Req }
 
      end
 ;
@@ -115,7 +115,7 @@ process([?ADMIN_KEY, <<"messages">>,  Chat],  _Body, Req)->
                      {json, Json, Req };
 
 	 []->  false_response(Req)
-     end.
+     end;
 
 process(_, _Body, Req)->
      ?CONSOLE_LOG("undefined request from ~p ~n",[Req]),
@@ -129,7 +129,7 @@ backup_chat(Cht)->
 				  {<<"ref">>, Cht},
 				  {<<"user1">>, chat_api:to_binary(U1)},
 				  {<<"ets">>, chat_api:to_binary(Ets) },
-				  {<<"user2">>, chat_api:to_binary(U2)}
+				  {<<"user2">>, chat_api:to_binary(U2)},
 				  {<<"messages">>, List } 
 				 ]),
               api_table_holder:save_chat(Cht, Json),

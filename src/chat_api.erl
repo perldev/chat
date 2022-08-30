@@ -19,16 +19,6 @@
          ]).
 
 
--record(message_record, 
-                {
-                id,
-                time,
-                username,
-                message
-                }
-).
-
-
 system_message(Tab,  Msg)->
        Ref = erlang:make_ref(),
        ets:insert( Tab,  #message_record{ 
@@ -264,7 +254,7 @@ to_binary(E) when is_integer(E)->
 to_binary(E) when is_atom(E)->
 	to_binary(atom_to_list(E));
 to_binary(E) when is_list(E)->
-	list_to_binary(E)
+	list_to_binary(E).
 
 to_atom(E) when is_integer(E)->
   E1 = integer_to_list(E),
