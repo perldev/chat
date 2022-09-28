@@ -19,16 +19,6 @@
          ]).
 
 
--record(message_record, 
-                {
-                id,
-                time,
-                username,
-                message
-                }
-).
-
-
 system_message(Tab,  Msg)->
        Ref = erlang:make_ref(),
        ets:insert( Tab,  #message_record{ 
@@ -57,9 +47,9 @@ last(Tab)->
      %
 
 from_json(KeyL)->
-   Time = propslist:get_value(KeyL, <<"time">>), 
-   Username = propslist:get_value(KeyL, <<"username">>),
-   Message = propslist:get_value(KeyL, <<"messsage">>),
+   Time = proplists:get_value(<<"time">>, KeyL), 
+   Username = proplists:get_value(<<"username">>, KeyL),
+   Message = proplists:get_value(<<"message">>, KeyL),
    % TimeSecs = (Mega * 1000000) + Sec,
    Mega = trunc(Time/1000000),
    Secs = Time rem 1000000,
@@ -258,13 +248,14 @@ raw_msg(Tab, Msg )->
 .
 
 
-
+to_binary(E) when is_binary(E)->
+	E;
 to_binary(E) when is_integer(E)->
 	to_binary(integer_to_list(E));
 to_binary(E) when is_atom(E)->
 	to_binary(atom_to_list(E));
 to_binary(E) when is_list(E)->
-	list_to_binary(E)
+	list_to_binary(E).
 
 to_atom(E) when is_integer(E)->
   E1 = integer_to_list(E),

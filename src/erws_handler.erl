@@ -60,7 +60,8 @@ auth_user(CookieSession)->
 		            case SessionObj of 
 		                undefined -> "";
 		                SessionObj ->
-		                   case get_key_dict(SessionObj, <<"username">>, false) of
+		                   case get_key_dict(SessionObj, {pickle_unicode, <<"username">> }, false) of
+
 		                             false ->  "";
 					     {pickle_unicode, Username} -> Username 
 		                   end
@@ -89,7 +90,6 @@ websocket_init(_Any, Req, []) ->
                  S = #chat_state{ip = IP, pid=self(), start=now(), username = UserName, opts=[], chat=Chat},
                  %%ok lets check the state
 		 case ets:lookup(?CHATS, Chat) of 
-		      []-> {stop,  S};%%close connection there is no such chat  
 		      [{Chat, L, _Msgs}]->  
 			      %% here we are checking permissions	 
                               Pred = fun(E) -> case E of Username -> true; _-> false end end,
@@ -99,6 +99,10 @@ websocket_init(_Any, Req, []) ->
 				  _ - > {stop, S}
 			       end;	  
 
+		      []->  
+                               %% try restore first
+                               api_table_holder:restore_chat(Chat),
+                               {stop,  S};%%close connection after reconnect it should find this chat
 		       _ ->  %it's private chat  only for User1 and User2 and system
                                  {stop, S}
 
@@ -161,7 +165,6 @@ send_them_all({Time, Username, Msg}, Chat)->
 			     end
 	        end, [], ?SESSIONS).
 	                                                                 
-
 
 process_req(State  = #chat_state{ index = 0},
                 [ {<<"ping">>, _}], Ets )->

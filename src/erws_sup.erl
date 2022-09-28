@@ -15,7 +15,7 @@ init([]) ->
         
         },
         Mcd = {local_memcache,
-                {mcd, start_link, [?LOCAL_CACHE, ["10.4.0.1", 11211]]},
+                {mcd, start_link, [?LOCAL_CACHE, ["127.0.0.1", 11211]]},
                permanent, 10000, worker, [mcd] },
                 
                 

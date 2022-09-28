@@ -3,7 +3,7 @@
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0, stop/0, status/0, start_archive/0, flush_chat/0, flush_chat/1, archive/3, new_message/1, 
-	 clear_online/0, backup_messages/1, create_store/2, create_store/1, save_chat/2,restore_chat/1 ]).
+	 clear_online/0, backup_messages/0, create_store/2, create_store/1, save_chat/2,restore_chat/1 ]).
 
 -include("erws_console.hrl").
 
@@ -28,9 +28,9 @@ init([]) ->
         EtsSess1 = ets:new(?CHATS, [public, named_table, set ] ),
 	ets:insert(?CHATS, {"", [], Ets}), %% insert default store for main chat
 
-	%timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
-        %                  start_archive, []),
-	%
+	timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
+                          start_archive, []),
+	
         timer:apply_interval(?INTERVAL_CLEAR, ?MODULE,
                              clear_online, []),
         
@@ -42,42 +42,27 @@ init([]) ->
                         users = EtsSess, 
 			timer_back = Timer
                            
-        } }
-	.
+        }}.
 
 restore_chat(Ref)->
     Result = gen_server:call(?MODULE, {restore_chat, Ref}),
-    {ok, _Cols, [[Json]]} = Result,
-
-%   {<<"ref">>, Cht},
-%   {<<"user1">>, U1},
-%   {<<"ets">>, chat_api:to_binary(Ets) },
-%   {<<"user2">>, U2}
-%   {<<"messages">>, List }		 
-    List  = erws_api:json_decode(Json),
-    U1 = proplists:get_value(<<"user1">>),
-    U2 = proplists:get_value(<<"user2">>),
-    Ets = proplists:get_value(<<"ets">>),
-    Ref = proplists:get_value(<<"ref">>),
-    Messages = proplists:get_value(<<"messages">>),
-    EtsA = chat_api:to_atom(Ets),
-    api_table_holder:create_store(EtsA, Messages),
-    case   proplists:get_value(<<"user3">>, undefined) of
-	 undefined ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA});
-	 U3 ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA})
-    end,
-
-
-    true.
+    case Result of
+         {ok, _Cols, [[Json]]} ->
+              List  = erws_api:json_decode(Json),
+              U1 = proplists:get_value(<<"user1">>),
+              U2 = proplists:get_value(<<"user2">>),
+              Ets = proplists:get_value(<<"ets">>),
+              Ref = proplists:get_value(<<"ref">>),
+              Messages = proplists:get_value(<<"messages">>),
+              EtsA = chat_api:to_atom(Ets),
+              api_table_holder:create_store(EtsA, Messages),
+              case   proplists:get_value(<<"user3">>, undefined) of
+	             undefined ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA});
+	             U3 ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA})
+              end, true;
 %% insert default store for main chat
-
-    
-
-    
-
-            
-.
-
+      _ -> false
+    end. 
 
 backup_messages()->
     gen_server:cast(?MODULE, backup)	
@@ -103,13 +88,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 
-handle_call({restore_chat, Ref}, MyState)->
+handle_call({restore_chat, Ref},_From, MyState)->
    Pid = MyState#monitor.mysql_pid, 
    Result = mysql:query(Pid, <<"SELECT history FROM  chats WHERE ref=?">>, [Ref]), 
-
-
    {reply, Result, MyState};  
-
 handle_call(status,_From ,State) ->
     ?LOG_DEBUG("get msg call ~p ~n", [status]),
     {reply, {   ets:tab2list(State#monitor.messages), ets:tab2list(State#monitor.users) } ,State};
@@ -125,7 +107,7 @@ flush_chat()->
       gen_server:cast(?MODULE, {flush_chat, ?DEFAULT_FLUSH_SIZE})   
 .
 
-save_chat(History, Ref)->
+save_chat(Ref, History)->
     gen_server:cast(?MODULE, {save_chat, Ref, History})   
 .	
 
@@ -162,13 +144,13 @@ handle_cast({new_msg, Msg}, MyState) ->
 handle_cast({create_store, Atom, L}, MyState) ->
     chat_api:create_store(Atom),
      %[{<<"time">>, TimeSecs}, {<<"username">>,Username}, {<<"message">>,Msg}]
-    Objs = lists:map(chat_api:from_json/1, L),
+    Objs = lists:map(fun(E) -> chat_api:from_json(E) end, L),
     ets:insert(Atom, Objs),
     {noreply, MyState};  
 handle_cast({save_chat, Ref, History}, MyState)->
    Pid = MyState#monitor.mysql_pid, 	
    mysql:query(Pid, <<"INSERT INTO chats(ref, history) VALUES (?,?)
-		       ON DUPLICATE KEY UPDATE  history=? ">>, [History, Ref, History]), 
+		       ON DUPLICATE KEY UPDATE  history=? ">>, [Ref, History, History]), 
    {noreply, MyState};  
 handle_cast({flush_chat, Count }, MyState) ->
     chat_api:delete_firstN_msgs(MyState#monitor.messages, Count, fun process_to_archive/4),     
@@ -192,7 +174,7 @@ handle_cast( archive_mysql_start, MyState) ->
                                   {password, Pwd}, {database, Base}
                                   ]),
 
-
+    ?CONSOLE_LOG("connect to mysql ~p", [Pid]),
  
     {noreply, MyState#monitor{mysql_pid=Pid}}.
     
