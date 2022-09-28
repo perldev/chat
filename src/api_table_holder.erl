@@ -26,7 +26,7 @@ init([]) ->
         Ets = chat_api:create_store(?MESSAGES, Back),
         EtsSess = ets:new(?SESSIONS, [public, named_table, set, {keypos,2} ] ),
         EtsSess1 = ets:new(?CHATS, [public, named_table, set ] ),
-	ets:insert(?CHATS, {"", undefined, undefined, Ets}), %% insert default store for main chat
+	ets:insert(?CHATS, {"", [], Ets}), %% insert default store for main chat
 
 	%timer:apply_after(?INIT_APPLY_TIMEOUT, ?MODULE,
         %                  start_archive, []),
@@ -62,7 +62,12 @@ restore_chat(Ref)->
     Messages = proplists:get_value(<<"messages">>),
     EtsA = chat_api:to_atom(Ets),
     api_table_holder:create_store(EtsA, Messages),
-    ets:insert(?CHATS, {Ref, U1, U2, EtsA}),
+    case   proplists:get_value(<<"user3">>, undefined) of
+	 undefined ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA});
+	 U3 ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA})
+    end,
+
+
     true.
 %% insert default store for main chat
 
@@ -119,6 +124,7 @@ start_archive()->
 flush_chat()->
       gen_server:cast(?MODULE, {flush_chat, ?DEFAULT_FLUSH_SIZE})   
 .
+
 save_chat(History, Ref)->
     gen_server:cast(?MODULE, {save_chat, Ref, History})   
 .	
@@ -145,7 +151,7 @@ process_to_archive(_Msid,  _Msgtime, Msgusername,  Msgmessage  )->
 
 handle_cast(backup, MyState)->
     L = ets:tab2list(?CHATS),
-    lists:foreach(fun({Chat, _U1, U2_, _Ets}) -> spawn_link(erws_api, backup_chat, [Chat])  end, L),
+    lists:foreach(fun({Chat, _L,  _Ets}) -> spawn_link(erws_api, backup_chat, [Chat])  end, L),
     {noreply, MyState};
 handle_cast(stop, MyState) ->
      io:format("somebody wants me dying\n", []),

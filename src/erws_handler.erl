@@ -90,12 +90,15 @@ websocket_init(_Any, Req, []) ->
                  %%ok lets check the state
 		 case ets:lookup(?CHATS, Chat) of 
 		      []-> {stop,  S};%%close connection there is no such chat  
-		      [{Chat, UserName, _User2, _Msgs}]->  
-				 ets:insert(?SESSIONS, S),
-				 {ok,  ReqRes, S};
-		      [{Chat, _User1 ,UserName, _Msgs}]->  
-				 ets:insert(?SESSIONS, S),
-				 {ok,  ReqRes,  S};
+		      [{Chat, L, _Msgs}]->  
+			      %% here we are checking permissions	 
+                              Pred = fun(E) -> case E of Username -> true; _-> false end end,
+                              case lists:search(Pred, L) of
+				 {value, _}-> ets:insert(?SESSIONS, S),
+				              {ok,  ReqRes, S};
+				  _ - > {stop, S}
+			       end;	  
+
 		       _ ->  %it's private chat  only for User1 and User2 and system
                                  {stop, S}
 
@@ -110,7 +113,7 @@ websocket_handle({text, Msg}, Req, State) ->
     ?CONSOLE_LOG(" Req: ~p ~n", [Message]),
     %% choose the chat
     case ets:lookup(?CHATS, State#chat_state.chat) of
-	[{_Key, _,_,  Ets}] -> 
+	[{_Key, _L,   Ets}] -> 
              {Res, NewState} = process_req(State, Message, Ets),
              ?CONSOLE_LOG("~p send back: ~p ~n",
 		 [{?MODULE, ?LINE}, {NewState, Res}]),

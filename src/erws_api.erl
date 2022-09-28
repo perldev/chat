@@ -123,15 +123,21 @@ process(_, _Body, Req)->
 
 backup_chat(Cht)->
      case ets:lookup(?CHATS, Cht)  of 
-	 [{Cht, U1, U2, Ets}]->
+	 [{Cht, LU,  Ets}]->
               List = chat_api:get_all_msgs(Ets, fun process_chat_msg/4),   
-              Json = json_encode([
+	      JsonL = [
 				  {<<"ref">>, Cht},
-				  {<<"user1">>, chat_api:to_binary(U1)},
 				  {<<"ets">>, chat_api:to_binary(Ets) },
-				  {<<"user2">>, chat_api:to_binary(U2)}
-				  {<<"messages">>, List } 
-				 ]),
+				  {<<"messages">>, List }
+		      ],
+	      ResJson = lists:foldl(fun(E, Sum)->      
+			                    U = lists:nth(E, LU),
+	                                    IB = integer_to_binary(E),
+			                    [{<<"user", IB/binary>>, chat_api:to_binary(U) }| Sum]
+			            end, 
+			            JsonL,
+			            lists:seq(1, length(LU))),
+              Json = json_encode(ResJson),
               api_table_holder:save_chat(Cht, Json),
 	      Json;
 	 []-> undefined
