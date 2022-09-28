@@ -61,7 +61,7 @@ process([?ADMIN_KEY, <<"chat">>, <<"create">>, Key], Body, Req) ->
      KeyA  = chat_api:to_atom(Key),
      %% TODO check the duplication of p2p chats
      api_table_holder:create_store(KeyA),
-     ets:insert(?CHATS, {Key, User1, User2, KeyA}), 
+     ets:insert(?CHATS, {Key, [User1, User2], KeyA}), 
      true_response(Req_2)
 ;
 process([?ADMIN_KEY,<<"unban">>,Username],  _Body, Req)->
@@ -78,6 +78,23 @@ process([?ADMIN_KEY, <<"ban">>,Username],  _Body, Req)->
           end  
      end,  ets:tab2list(ets_sessions_holder)),
      true_response(Req);
+process([?ADMIN_KEY,<<"add_user">>, Username, Chat],  _Body, Req)->
+     %TODO move api_tableholder	
+     case ets:lookup(?CHATS, Chat) of 
+         []-> false_response(Req);	     
+	 [{Chat, L, Ets}]->
+		ets:insert(?CHATS, {Chat, [Username|L], Ets}),
+     		true_response(Req) 
+     end;
+process([?ADMIN_KEY,<<"remove_user">>, Username, Chat],  Body, Req)->
+     %TODO move api_tableholder	
+     case ets:lookup(?CHATS, Chat) of 
+         []-> false_response(Req);	     
+	 [{Chat, L, Ets}]->
+		      
+		ets:insert(?CHATS, {Chat, lists:delete(Username, L ), Ets}),
+     		true_response(Req) 
+     end;
 process([?ADMIN_KEY,<<"post">>, Username],  Body, Req)->
      Echo = proplists:get_value(<<"msg">>, Body),      
      chat_api:put_new_message(?MESSAGES, {Username, Echo}),
@@ -87,7 +104,7 @@ process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
      Echo = proplists:get_value(<<"msg">>, Body),    
      ?CONSOLE_LOG("request  post from ~p to ~p msg ~p ~n",[Req, Chat, Echo]),
      case ets:lookup(?CHATS, Chat)  of 
-	 [{Chat, _U1,_U2, Ets}]->
+	 [{Chat, _L,  Ets}]->
 		chat_api:put_new_message(Ets, {Username, Echo}),
                 true_response(Req);
 	 []-> false_response(Req)
@@ -105,7 +122,7 @@ process([?ADMIN_KEY, <<"save">>,  Chat],  _Body, Req)->
 process([?ADMIN_KEY, <<"messages">>,  Chat],  _Body, Req)->
      ?CONSOLE_LOG("request  get messages from ~p to ~p ~n",[Req, Chat ]),
      case ets:lookup(?CHATS, Chat)  of 
-	 [{Chat, _U1,_U2, Ets}]->
+	 [{Chat, _L, Ets}]->
 		     From  = chat_api:last(Ets),
                      List = chat_api:get_last_count(Ets, From, 65000, fun process_chat_msg/4),   
 		     ?CONSOLE_LOG("chat list: ~p ~n~n", [List]),
