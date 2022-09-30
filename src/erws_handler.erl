@@ -94,9 +94,9 @@ websocket_init(_Any, Req, []) ->
 			      %% here we are checking permissions	 
                               Pred = fun(E) -> case E of Username -> true; _-> false end end,
                               case lists:search(Pred, L) of
-				 {value, _}-> ets:insert(?SESSIONS, S),
+				 {value, _} -> ets:insert(?SESSIONS, S),
 				              {ok,  ReqRes, S};
-				  _ - > {stop, S}
+				  _ -> {stop, S}
 			       end;	  
 
 		      []->  

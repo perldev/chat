@@ -83,7 +83,8 @@ process([?ADMIN_KEY,<<"add_user">>, Username, Chat],  _Body, Req)->
      case ets:lookup(?CHATS, Chat) of 
          []-> false_response(Req);	     
 	 [{Chat, L, Ets}]->
-		ets:insert(?CHATS, {Chat, [Username|L], Ets}),
+                L2 = lists:delete(Username, L ), %% avoiding duplicates
+		ets:insert(?CHATS, {Chat, [Username|L2], Ets}),
      		true_response(Req) 
      end;
 process([?ADMIN_KEY,<<"remove_user">>, Username, Chat],  Body, Req)->

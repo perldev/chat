@@ -49,15 +49,15 @@ restore_chat(Ref)->
     case Result of
          {ok, _Cols, [[Json]]} ->
               List  = erws_api:json_decode(Json),
-              U1 = proplists:get_value(<<"user1">>),
-              U2 = proplists:get_value(<<"user2">>),
-              Ets = proplists:get_value(<<"ets">>),
-              Ref = proplists:get_value(<<"ref">>),
-              Messages = proplists:get_value(<<"messages">>),
+              U1 = proplists:get_value(<<"user1">>, List),
+              U2 = proplists:get_value(<<"user2">>, List),
+              Ets = proplists:get_value(<<"ets">>, List),
+              Ref = proplists:get_value(<<"ref">>, List),
+              Messages = proplists:get_value(<<"messages">>, List),
               EtsA = chat_api:to_atom(Ets),
               api_table_holder:create_store(EtsA, Messages),
-              case   proplists:get_value(<<"user3">>, undefined) of
-	             undefined ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA});
+              case   proplists:get_value(<<"user3">>, List, undefined) of
+	             undefined ->    ets:insert(?CHATS, {Ref, [U1, U2], EtsA});
 	             U3 ->    ets:insert(?CHATS, {Ref, [U1, U2, U3], EtsA})
               end, true;
 %% insert default store for main chat
