@@ -84,7 +84,7 @@ get_last_count(Tab, From, Count, Fun)->
                               ),
                            [NewItem | Accum]                    
                        end, [],
-                       RevesedList
+                      RevesedList
                        )
         
 .
@@ -102,6 +102,7 @@ get_from_reverse(Tab, From, Index, Fun)->
                 
              [] -> []
            end,
+           
            lists:foldl(fun(Msg, Accum)-> 
                            NewItem =
                               Fun(Msg#message_record.id,

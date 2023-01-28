@@ -15,7 +15,7 @@
 
 -export([websocket_terminate/3]).
 % Called to know how to dispatch a new connection.
--export([process_chat_msg/4]).
+-export([process_chat_msg/4, send_them_all/2]).
 init({tcp, http}, _Req, _Opts) ->
 %     % "upgrade" every request to websocket,
 %         % we're not interested in serving any other conten

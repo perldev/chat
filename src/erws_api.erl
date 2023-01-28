@@ -5,7 +5,7 @@
 
 % Behaviour cowboy_http_handler
 -export([init/3, hexstring/1, generate_key/2, backup_chat/1, json_decode/1, json_encode/1 ]).
-
+-import(erws_handler, [send_them_all/2]).
 
 
 
@@ -98,7 +98,11 @@ process([?ADMIN_KEY,<<"remove_user">>, Username, Chat],  Body, Req)->
      end;
 process([?ADMIN_KEY,<<"post">>, Username],  Body, Req)->
      Echo = proplists:get_value(<<"msg">>, Body),      
-     chat_api:put_new_message(?MESSAGES, {Username, Echo}),
+     From = chat_api:put_new_message(?MESSAGES, {Username, Echo}),
+     StoredMsg  = chat_api:get_msg(?MESSAGES, From),
+     send_them_all(StoredMsg, ""),
+
+
      ?CONSOLE_LOG("request  post from ~p ~n",[Req]),
      true_response(Req);
 process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
@@ -106,7 +110,9 @@ process([?ADMIN_KEY,<<"post">>, Username, Chat],  Body, Req)->
      ?CONSOLE_LOG("request  post from ~p to ~p msg ~p ~n",[Req, Chat, Echo]),
      case ets:lookup(?CHATS, Chat)  of 
 	 [{Chat, _L,  Ets}]->
-		chat_api:put_new_message(Ets, {Username, Echo}),
+		From = chat_api:put_new_message(Ets, {Username, Echo}),
+                StoredMsg  = chat_api:get_msg(Ets, From),
+                send_them_all(StoredMsg, Chat ),
                 true_response(Req);
 	 []-> false_response(Req)
      end;
